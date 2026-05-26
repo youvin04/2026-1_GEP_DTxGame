@@ -15,6 +15,12 @@
 /[Uu]ser[Ss]ettings/
 *.log
 
+# Local API keys / secrets
+config.local.json
+config.local.json.meta
+*.secret.json
+ApiConfig.json
+
 # By default unity supports Blender asset imports, *.blend1 blender files do not need to be commited to version control.
 *.blend1
 *.blend1.meta

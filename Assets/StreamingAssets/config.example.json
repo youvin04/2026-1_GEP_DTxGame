@@ -1,0 +1,9 @@
+{
+  "geminiApiKey": "PUT_YOUR_GEMINI_API_KEY_HERE",
+  "liveModel": "gemini-2.5-flash-native-audio-preview-12-2025",
+  "judgeModel": "gemini-2.5-flash",
+  "language": "ko-KR",
+  "saveApiKeyLocally": true,
+  "generateContentBaseUrl": "https://generativelanguage.googleapis.com/v1beta/models",
+  "liveWebSocketUrl": "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
+}
