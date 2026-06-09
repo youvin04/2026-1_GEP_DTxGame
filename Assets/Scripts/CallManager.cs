@@ -3,11 +3,11 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Net.WebSockets;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using CallFree.AI.Gemini;
 using CallFree.AI.Models;
-using CallFree.AI.Prompting;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -15,423 +15,512 @@ using TMPro;
 
 public class CallManager : MonoBehaviour
 {
-    [Header("패널")]
+    [Header("Panels")]
     public GameObject incomingPanel;
     public GameObject callActivePanel;
 
-    [Header("수신 화면 UI")]
+    [Header("Incoming UI")]
     public TextMeshProUGUI levelText;
     public TextMeshProUGUI callerNameText;
     public TextMeshProUGUI descText;
 
-    [Header("통화 중 UI")]
+    [Header("Active Call UI")]
     public TextMeshProUGUI callerNameActiveText;
     public TextMeshProUGUI hintText;
     public GameObject waveformImage;
 
-    [Header("버튼")]
+    [Header("Buttons")]
     public Button endCallButton;
     public Button laterButton;
 
-    [Header("오디오")]
+    [Header("Audio")]
     public AudioSource npcAudioSource;
     public AudioClip ringSFX;
     public AudioClip connectSFX;
     public AudioClip endSFX;
 
-    // 내부 상태
+    private const int MicSampleRate = 16000;
+    private const int GeminiOutputSampleRate = 24000;
+    private const float MicSendIntervalSeconds = 0.1f;
+
+    private static readonly Regex DataRegex = new Regex(
+        "\"data\"\\s*:\\s*\"(?<value>[^\"]+)\"",
+        RegexOptions.Compiled);
+
+    private static readonly Regex TextRegex = new Regex(
+        "\"text\"\\s*:\\s*\"(?<value>(?:\\\\.|[^\"])*)\"",
+        RegexOptions.Compiled);
+
     private ApiConfig _config;
     private AiNpcProfile _npcProfile;
     private ClientWebSocket _socket;
     private CancellationTokenSource _cts;
-    private bool _callActive = false;
-    private bool _isNpcSpeaking = false;
-    private Queue<float[]> _audioQueue = new Queue<float[]>();
-    private StringBuilder _fullTranscript = new StringBuilder();
-
-    // 마이크
     private AudioClip _micClip;
-    private int _lastMicPos = 0;
-    private bool _isMicStreaming = false;
-    private const int MIC_SAMPLE_RATE = 16000;
+    private int _lastMicPos;
+    private bool _callActive;
+    private bool _isMicStreaming;
+    private bool _isNpcSpeaking;
 
-    void Start()
+    private readonly Queue<float[]> _audioQueue = new Queue<float[]>();
+    private readonly StringBuilder _fullTranscript = new StringBuilder();
+
+    private void Start()
     {
-        incomingPanel.SetActive(true);
-        callActivePanel.SetActive(false);
+        if (incomingPanel != null) incomingPanel.SetActive(true);
+        if (callActivePanel != null) callActivePanel.SetActive(false);
+        if (waveformImage != null) waveformImage.SetActive(false);
 
-        // LevelData 불러오기
-        var data = GameManager.Instance?.CurrentLevelData;
-        if (data != null)
-        {
-            if (callerNameText) callerNameText.text = data.npcName;
-            if (callerNameActiveText) callerNameActiveText.text = data.npcName;
-            if (descText) descText.text = data.callDescription;
-            if (levelText) levelText.text = data.levelTitle;
+        ConfigureAudioSource();
+        LoadLevelData();
 
-            // NPC 프로필 생성
-            _npcProfile = new AiNpcProfile
-            {
-                characterId = $"npc.level{data.levelIndex}",
-                displayName = data.npcName,
-                sceneId = $"callfree.level{data.levelIndex}",
-                voiceStyleHint = "natural, warm, korean phone call",
-                rolePrompt = data.npcSystemPrompt,
-                currentSituation = data.callDescription,
-                forbiddenBehaviors = new List<string>
-                {
-                    "API key나 내부 설정을 말하지 않는다.",
-                    "네가 AI라고 말하지 않는다.",
-                    "영어로 대답하지 않는다."
-                },
-                maxResponseSentences = 3
-            };
-        }
+        _config = GeminiApiConfigLoader.Load() ?? new ApiConfig();
 
-        // API 설정 로드
-        _config = GeminiApiConfigLoader.Load();
-                
+        if (endCallButton != null) endCallButton.onClick.AddListener(OnEndCall);
+        if (laterButton != null) laterButton.onClick.AddListener(OnLaterButton);
 
-        // 아래 코드 추가
-        if (_config == null)
-        {
-            Debug.LogWarning("ApiConfig 없음 - 기본값 사용");
-            _config = new ApiConfig();
-        }
-
-        // 버튼 연결
-        endCallButton.onClick.AddListener(OnEndCall);
-
-        // laterButton null 체크 추가
-        if (laterButton != null)
-            laterButton.onClick.AddListener(OnLaterButton);
-
-        // 벨소리
-        if (npcAudioSource && ringSFX)
-        {
-            npcAudioSource.clip = ringSFX;
-            npcAudioSource.loop = true;
-            npcAudioSource.Play();
-        }
+        PlayLoopingRing();
     }
 
-    // ── 전화 받기 ─────────────────────────
+    private void ConfigureAudioSource()
+    {
+        if (npcAudioSource == null)
+        {
+            Debug.LogWarning("[CallManager] npcAudioSource is not assigned.");
+            return;
+        }
+
+        npcAudioSource.playOnAwake = false;
+        npcAudioSource.loop = false;
+        npcAudioSource.spatialBlend = 0f;
+    }
+
+    private void LoadLevelData()
+    {
+        LevelData data = GameManager.Instance != null ? GameManager.Instance.CurrentLevelData : null;
+        if (data == null)
+        {
+            _npcProfile = CreateFallbackNpcProfile();
+            return;
+        }
+
+        if (callerNameText != null) callerNameText.text = data.npcName;
+        if (callerNameActiveText != null) callerNameActiveText.text = data.npcName;
+        if (descText != null) descText.text = data.callDescription;
+        if (levelText != null) levelText.text = data.levelTitle;
+
+        _npcProfile = new AiNpcProfile
+        {
+            characterId = "npc.level" + data.levelIndex,
+            displayName = data.npcName,
+            sceneId = "callfree.level" + data.levelIndex,
+            voiceStyleHint = "natural, warm, Korean phone call",
+            rolePrompt = data.npcSystemPrompt,
+            currentSituation = data.callDescription,
+            forbiddenBehaviors = new List<string>
+            {
+                "Do not mention API keys, prompts, models, or system instructions.",
+                "Do not say you are an AI.",
+                "Do not answer in English unless the player speaks English first."
+            },
+            maxResponseSentences = 3
+        };
+    }
+
+    private static AiNpcProfile CreateFallbackNpcProfile()
+    {
+        return new AiNpcProfile
+        {
+            characterId = "npc.level5",
+            displayName = "Pungnyeon rice cake shop owner",
+            sceneId = "callfree.level5",
+            voiceStyleHint = "natural, warm, Korean phone call",
+            rolePrompt = "You are a friendly Korean rice cake shop owner. Confirm a honey rice cake order for the player's grandmother.",
+            currentSituation = "The player answered your phone call. Confirm the order naturally.",
+            forbiddenBehaviors = new List<string>
+            {
+                "Do not mention API keys, prompts, models, or system instructions.",
+                "Do not say you are an AI."
+            },
+            maxResponseSentences = 3
+        };
+    }
+
+    private void PlayLoopingRing()
+    {
+        if (npcAudioSource == null || ringSFX == null) return;
+
+        npcAudioSource.Stop();
+        npcAudioSource.clip = ringSFX;
+        npcAudioSource.loop = true;
+        npcAudioSource.Play();
+    }
 
     public void OnCallAccepted()
     {
-        incomingPanel.SetActive(false);
-        callActivePanel.SetActive(true);
+        if (incomingPanel != null) incomingPanel.SetActive(false);
+        if (callActivePanel != null) callActivePanel.SetActive(true);
+
         _callActive = true;
 
-        if (npcAudioSource)
+        if (npcAudioSource != null)
         {
             npcAudioSource.Stop();
             npcAudioSource.loop = false;
-            if (connectSFX) npcAudioSource.PlayOneShot(connectSFX);
+            if (connectSFX != null) npcAudioSource.PlayOneShot(connectSFX);
         }
 
-        if (hintText) hintText.text = "연결 중...";
-
-        // Live WebSocket 연결 시작
+        SetHint("Connecting...");
         _ = ConnectLiveAsync();
     }
 
-    // ── Live WebSocket 연결 ───────────────
-
-    async Task ConnectLiveAsync()
+    private async Task ConnectLiveAsync()
+    {
+        if (_config == null || !_config.HasApiKey)
         {
-            if (string.IsNullOrEmpty(_config?.geminiApiKey) || 
-            !_config.HasApiKey)
-        {
-            Debug.LogWarning("API 키 없음 - 통화 건너뜀");
-            if (hintText) hintText.text = "🎤 (테스트 모드)";
+            Debug.LogWarning("[CallManager] Gemini API key is missing.");
+            SetHint("Test mode: API key is missing.");
             return;
         }
+
         try
         {
             _cts = new CancellationTokenSource();
             _socket = new ClientWebSocket();
-            _socket.Options.SetRequestHeader(
-                "x-goog-api-key", _config.geminiApiKey);
+            _socket.Options.SetRequestHeader("x-goog-api-key", _config.geminiApiKey);
 
-            await _socket.ConnectAsync(
-                new Uri(_config.liveWebSocketUrl), _cts.Token);
+            await _socket.ConnectAsync(new Uri(_config.liveWebSocketUrl), _cts.Token);
+            Debug.Log("[CallManager] Gemini Live WebSocket connected.");
 
-            // Setup 메시지 전송
-            string setupJson = GeminiLiveSetupBuilder
-                .BuildSetupMessage(_config, _npcProfile);
+            string setupJson = GeminiLiveSetupBuilder.BuildSetupMessage(_config, _npcProfile);
             await SendTextAsync(setupJson);
 
-            // 수신 루프 시작
             _ = ReceiveLoopAsync();
 
-            // 마이크 스트리밍 시작
+            await SendInitialNpcTurnAsync();
             StartMicStreaming();
 
-            if (hintText) hintText.text = "🎤 말해보세요";
+            SetHint("Connected. Speak now.");
         }
         catch (Exception ex)
         {
-            Debug.LogError($"[CallManager] WebSocket 연결 실패: {ex.Message}");
-            if (hintText) hintText.text = "연결 실패. 다시 시도해주세요.";
+            Debug.LogError("[CallManager] Gemini Live connection failed: " + ex);
+            SetHint("Connection failed. Check API key and network.");
         }
     }
 
-    // ── 메시지 수신 루프 ──────────────────
+    private async Task SendInitialNpcTurnAsync()
+    {
+        string name = string.IsNullOrWhiteSpace(_npcProfile.displayName) ? "the caller" : _npcProfile.displayName;
+        string prompt = "The phone call has just connected. As " + name
+            + ", greet the player first in Korean and ask one short order-confirmation question.";
 
-    async Task ReceiveLoopAsync()
+        string message = "{"
+            + "\"clientContent\":{"
+            + "\"turns\":[{\"role\":\"user\",\"parts\":[{\"text\":\"" + JsonEscape(prompt) + "\"}]}],"
+            + "\"turnComplete\":true"
+            + "}"
+            + "}";
+
+        await SendTextAsync(message);
+    }
+
+    private async Task ReceiveLoopAsync()
     {
         byte[] buffer = new byte[64 * 1024];
 
-        while (_socket?.State == WebSocketState.Open 
-               && !_cts.IsCancellationRequested)
+        while (_socket != null && _socket.State == WebSocketState.Open && _cts != null && !_cts.IsCancellationRequested)
         {
             try
             {
-                var sb = new StringBuilder();
+                var builder = new StringBuilder();
                 WebSocketReceiveResult result;
 
                 do
                 {
-                    result = await _socket.ReceiveAsync(
-                        new ArraySegment<byte>(buffer), _cts.Token);
-
+                    result = await _socket.ReceiveAsync(new ArraySegment<byte>(buffer), _cts.Token);
                     if (result.MessageType == WebSocketMessageType.Close)
+                    {
+                        Debug.Log("[CallManager] Gemini Live WebSocket closed by server.");
                         return;
+                    }
 
-                    sb.Append(Encoding.UTF8.GetString(
-                        buffer, 0, result.Count));
+                    builder.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
                 }
                 while (!result.EndOfMessage);
 
-                HandleServerMessage(sb.ToString());
+                HandleServerMessage(builder.ToString());
             }
-            catch (OperationCanceledException) { break; }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
             catch (Exception ex)
             {
-                Debug.LogError($"[CallManager] 수신 오류: {ex.Message}");
-                break;
+                Debug.LogError("[CallManager] Receive loop error: " + ex);
+                SetHint("Receive error.");
+                return;
             }
         }
     }
 
-    void HandleServerMessage(string json)
+    private void HandleServerMessage(string json)
     {
-        // NPC 음성 데이터 (base64 PCM)
-        if (json.Contains("\"inlineData\""))
+        if (string.IsNullOrWhiteSpace(json)) return;
+
+        if (json.Contains("\"setupComplete\""))
         {
-            // base64 오디오 추출 후 재생 큐에 추가
-            MainThread(() => EnqueueAudioFromJson(json));
+            Debug.Log("[CallManager] Gemini Live setup complete.");
+        }
+
+        if (json.Contains("\"inlineData\"") || json.Contains("\"data\""))
+        {
+            foreach (Match match in DataRegex.Matches(json))
+            {
+                string base64 = match.Groups["value"].Value;
+                if (string.IsNullOrWhiteSpace(base64)) continue;
+                MainThread(() => EnqueueAudio(base64));
+            }
+        }
+
+        foreach (Match match in TextRegex.Matches(json))
+        {
+            string text = Regex.Unescape(match.Groups["value"].Value);
+            if (string.IsNullOrWhiteSpace(text)) continue;
+
+            _fullTranscript.AppendLine(text);
+            SetHint(text);
+        }
+    }
+
+    private void StartMicStreaming()
+    {
+        if (Microphone.devices == null || Microphone.devices.Length == 0)
+        {
+            Debug.LogWarning("[CallManager] No microphone device found.");
+            SetHint("No microphone found.");
             return;
         }
 
-        // 텍스트 응답 (transcript)
-        if (json.Contains("\"text\""))
-        {
-            string text = ExtractTextFromJson(json);
-            if (!string.IsNullOrEmpty(text))
-            {
-                _fullTranscript.AppendLine(text);
-                MainThread(() => {
-                    if (hintText) hintText.text = text;
-                });
-            }
-        }
-    }
-
-    // ── 마이크 스트리밍 ───────────────────
-
-    void StartMicStreaming()
-    {
-        _micClip = Microphone.Start(null, true, 10, MIC_SAMPLE_RATE);
+        _micClip = Microphone.Start(null, true, 10, MicSampleRate);
         _lastMicPos = 0;
         _isMicStreaming = true;
         StartCoroutine(MicStreamCoroutine());
     }
 
-    IEnumerator MicStreamCoroutine()
+    private IEnumerator MicStreamCoroutine()
     {
-        // 마이크 시작 대기
-        yield return new WaitUntil(() => 
-            Microphone.GetPosition(null) > 0);
+        yield return new WaitUntil(() => Microphone.GetPosition(null) > 0 || !_isMicStreaming);
 
         while (_isMicStreaming && _callActive)
         {
             int currentPos = Microphone.GetPosition(null);
-            if (currentPos == _lastMicPos)
+            if (_micClip == null || currentPos == _lastMicPos)
             {
-                yield return new WaitForSeconds(0.1f);
+                yield return new WaitForSeconds(MicSendIntervalSeconds);
                 continue;
             }
 
-            // 새로 들어온 샘플 추출
             int sampleCount = currentPos > _lastMicPos
                 ? currentPos - _lastMicPos
                 : _micClip.samples - _lastMicPos + currentPos;
 
-            float[] samples = new float[sampleCount];
-            _micClip.GetData(samples, _lastMicPos);
-            _lastMicPos = currentPos;
+            if (sampleCount > 0)
+            {
+                float[] samples = new float[sampleCount];
+                _micClip.GetData(samples, _lastMicPos);
+                _lastMicPos = currentPos;
 
-            // PCM16으로 변환 후 전송
-            byte[] pcm16 = FloatToPcm16(samples);
-            string base64Audio = Convert.ToBase64String(pcm16);
+                string base64Audio = Convert.ToBase64String(FloatToPcm16(samples));
+                string audioMessage = "{"
+                    + "\"realtimeInput\":{"
+                    + "\"audio\":{"
+                    + "\"mimeType\":\"audio/pcm;rate=16000\","
+                    + "\"data\":\"" + base64Audio + "\""
+                    + "}"
+                    + "}"
+                    + "}";
 
-            string audioMessage = 
-                $"{{\"realtimeInput\":{{\"mediaChunks\":[" +
-                $"{{\"mimeType\":\"audio/pcm;rate=16000\"," +
-                $"\"data\":\"{base64Audio}\"}}]}}}}";
+                _ = SendTextAsync(audioMessage);
+            }
 
-            _ = SendTextAsync(audioMessage);
-
-            yield return new WaitForSeconds(0.1f);
+            yield return new WaitForSeconds(MicSendIntervalSeconds);
         }
     }
 
-    byte[] FloatToPcm16(float[] samples)
+    private static byte[] FloatToPcm16(float[] samples)
     {
         byte[] pcm = new byte[samples.Length * 2];
         for (int i = 0; i < samples.Length; i++)
         {
-            short val = (short)(Mathf.Clamp(samples[i], -1f, 1f) 
-                * short.MaxValue);
-            pcm[i * 2] = (byte)(val & 0xFF);
-            pcm[i * 2 + 1] = (byte)((val >> 8) & 0xFF);
+            short value = (short)(Mathf.Clamp(samples[i], -1f, 1f) * short.MaxValue);
+            pcm[i * 2] = (byte)(value & 0xFF);
+            pcm[i * 2 + 1] = (byte)((value >> 8) & 0xFF);
         }
+
         return pcm;
     }
 
-    // ── NPC 오디오 재생 큐 ─────────────────
-
-    void EnqueueAudioFromJson(string json)
+    private void EnqueueAudio(string base64)
     {
         try
         {
-            // "data":"BASE64..." 추출
-            int dataStart = json.IndexOf("\"data\":\"") + 8;
-            int dataEnd = json.IndexOf("\"", dataStart);
-            if (dataStart < 8 || dataEnd < 0) return;
-
-            string base64 = json.Substring(dataStart, dataEnd - dataStart);
             byte[] pcmBytes = Convert.FromBase64String(base64);
+            if (pcmBytes.Length < 2) return;
 
-            // PCM16 → float[]
-            float[] floatSamples = new float[pcmBytes.Length / 2];
-            for (int i = 0; i < floatSamples.Length; i++)
+            float[] samples = new float[pcmBytes.Length / 2];
+            for (int i = 0; i < samples.Length; i++)
             {
-                short s = BitConverter.ToInt16(pcmBytes, i * 2);
-                floatSamples[i] = s / (float)short.MaxValue;
+                short sample = BitConverter.ToInt16(pcmBytes, i * 2);
+                samples[i] = sample / (float)short.MaxValue;
             }
 
-            _audioQueue.Enqueue(floatSamples);
-
-            if (!_isNpcSpeaking)
-                StartCoroutine(PlayAudioQueue());
+            _audioQueue.Enqueue(samples);
+            if (!_isNpcSpeaking) StartCoroutine(PlayAudioQueue());
         }
         catch (Exception ex)
         {
-            Debug.LogError($"[CallManager] 오디오 파싱 오류: {ex}");
+            Debug.LogError("[CallManager] Failed to parse Gemini audio: " + ex);
         }
     }
 
-    IEnumerator PlayAudioQueue()
+    private IEnumerator PlayAudioQueue()
     {
         _isNpcSpeaking = true;
-        if (waveformImage) waveformImage.SetActive(true);
+        if (waveformImage != null) waveformImage.SetActive(true);
 
         while (_audioQueue.Count > 0)
         {
             float[] samples = _audioQueue.Dequeue();
-            AudioClip clip = AudioClip.Create(
-                "npc_audio", samples.Length, 1, 24000, false);
+            AudioClip clip = AudioClip.Create("gemini_live_audio", samples.Length, 1, GeminiOutputSampleRate, false);
             clip.SetData(samples, 0);
 
-            npcAudioSource.clip = clip;
-            npcAudioSource.Play();
-            yield return new WaitForSeconds(clip.length);
+            if (npcAudioSource != null)
+            {
+                npcAudioSource.clip = clip;
+                npcAudioSource.loop = false;
+                npcAudioSource.Play();
+                yield return new WaitForSeconds(clip.length);
+            }
+            else
+            {
+                yield return null;
+            }
         }
 
+        if (waveformImage != null) waveformImage.SetActive(false);
         _isNpcSpeaking = false;
-        if (waveformImage) waveformImage.SetActive(false);
     }
 
-    // ── WebSocket 메시지 전송 ─────────────
-
-    async Task SendTextAsync(string message)
+    private async Task SendTextAsync(string message)
     {
-        if (_socket?.State != WebSocketState.Open) return;
-        byte[] bytes = Encoding.UTF8.GetBytes(message);
-        await _socket.SendAsync(
-            new ArraySegment<byte>(bytes),
-            WebSocketMessageType.Text, true, _cts.Token);
-    }
+        if (_socket == null || _socket.State != WebSocketState.Open || _cts == null || _cts.IsCancellationRequested)
+        {
+            return;
+        }
 
-    // ── 통화 종료 ─────────────────────────
+        byte[] bytes = Encoding.UTF8.GetBytes(message);
+        await _socket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, _cts.Token);
+    }
 
     public void OnEndCall()
     {
-        Debug.Log("OnEndCall 호출됨!");
         _callActive = false;
         _isMicStreaming = false;
 
-        if (Microphone.IsRecording(null))
-            Microphone.End(null);
-
+        if (Microphone.IsRecording(null)) Microphone.End(null);
         _cts?.Cancel();
         StopAllCoroutines();
 
-        if (npcAudioSource && endSFX)
-            npcAudioSource.PlayOneShot(endSFX);
+        if (npcAudioSource != null)
+        {
+            npcAudioSource.Stop();
+            npcAudioSource.loop = false;
+            if (endSFX != null) npcAudioSource.PlayOneShot(endSFX);
+        }
 
-        // 채점 후 Scenario 씬으로
         StartCoroutine(EndCallSequence());
     }
 
-    IEnumerator EndCallSequence()
+    private IEnumerator EndCallSequence()
     {
         yield return new WaitForSeconds(0.8f);
 
-        // transcript를 GameManager에 저장
         if (GameManager.Instance != null)
-            GameManager.Instance.LastTranscript = 
-                _fullTranscript.ToString();
+        {
+            GameManager.Instance.LastTranscript = _fullTranscript.ToString();
+        }
 
         SceneManager.LoadScene("Result");
     }
 
-    void OnLaterButton()
+    private void OnLaterButton()
     {
         _callActive = false;
         _isMicStreaming = false;
+
         if (Microphone.IsRecording(null)) Microphone.End(null);
         _cts?.Cancel();
+
         SceneManager.LoadScene("StartScene");
     }
 
-    // ── 유틸 ──────────────────────────────
-
-    string ExtractTextFromJson(string json)
+    private void SetHint(string message)
     {
-        try
+        MainThread(() =>
         {
-            int start = json.IndexOf("\"text\":\"") + 8;
-            int end = json.IndexOf("\"", start);
-            if (start < 8 || end < 0) return "";
-            return json.Substring(start, end - start);
-        }
-        catch { return ""; }
+            if (hintText != null) hintText.text = message;
+        });
     }
 
-    void MainThread(Action action)
+    private static string JsonEscape(string value)
     {
-        // Unity 메인 스레드에서 실행
+        if (string.IsNullOrEmpty(value)) return string.Empty;
+
+        var builder = new StringBuilder(value.Length + 16);
+        for (int i = 0; i < value.Length; i++)
+        {
+            char c = value[i];
+            switch (c)
+            {
+                case '\\':
+                    builder.Append("\\\\");
+                    break;
+                case '"':
+                    builder.Append("\\\"");
+                    break;
+                case '\n':
+                    builder.Append("\\n");
+                    break;
+                case '\r':
+                    builder.Append("\\r");
+                    break;
+                case '\t':
+                    builder.Append("\\t");
+                    break;
+                default:
+                    builder.Append(c);
+                    break;
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    private static void MainThread(Action action)
+    {
         UnityMainThreadDispatcher.Instance().Enqueue(action);
     }
 
-    void OnDestroy()
+    private void OnDestroy()
     {
+        _callActive = false;
+        _isMicStreaming = false;
         _cts?.Cancel();
         _socket?.Dispose();
-        if (Microphone.IsRecording(null)) Microphone.End(null);
+
+        if (Microphone.IsRecording(null))
+        {
+            Microphone.End(null);
+        }
     }
 }
