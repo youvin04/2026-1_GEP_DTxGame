@@ -110,8 +110,12 @@ namespace CallFree.AI.Gemini
             return "{"
                 + "\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"" + JsonEscape(prompt) + "\"}]}],"
                 + "\"generationConfig\":{"
-                + "\"responseMimeType\":\"application/json\","
-                + "\"responseJsonSchema\":" + AnswerJudgementSchema.Json
+                + "\"responseFormat\":{"
+                + "\"text\":{"
+                + "\"mimeType\":\"application/json\","
+                + "\"schema\":" + AnswerJudgementSchema.Json
+                + "}"
+                + "}"
                 + "}"
                 + "}";
         }

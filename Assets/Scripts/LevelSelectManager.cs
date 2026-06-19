@@ -6,7 +6,7 @@ using TMPro;
 public class LevelSelectManager : MonoBehaviour
 {
     [Header("레벨 데이터 연결")]
-    public LevelData[] levels;  // Level_05 드래그
+    public LevelData[] levels;
 
     void Start()
     {
@@ -19,9 +19,15 @@ public class LevelSelectManager : MonoBehaviour
         if (GameManager.Instance != null)
         {
             GameManager.Instance.CurrentLevel = levelIndex;
-            // levels 배열에서 안전하게 접근
-            if (levels != null && levels.Length > 0)
-                GameManager.Instance.CurrentLevelData = levels[0];
+            if (levels != null && levelIndex >= 0 && levelIndex < levels.Length)
+            {
+                GameManager.Instance.CurrentLevelData = levels[levelIndex];
+            }
+            else
+            {
+                Debug.LogWarning("[LevelSelectManager] LevelData is missing for index " + levelIndex);
+                GameManager.Instance.CurrentLevelData = null;
+            }
         }
         SceneManager.LoadScene("Scenario");
     }

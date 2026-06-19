@@ -42,6 +42,9 @@ public class CallManager : MonoBehaviour
     private const int MicSampleRate = 16000;
     private const int GeminiOutputSampleRate = 24000;
     private const float MicSendIntervalSeconds = 0.1f;
+    private const float InitialAudioBufferSeconds = 0.18f;
+    private const float AudioQueuePollSeconds = 0.02f;
+    private const float AutoEndAfterPassSeconds = 2.4f;
 
     private static readonly Regex DataRegex = new Regex(
         "\"data\"\\s*:\\s*\"(?<value>[^\"]+)\"",
@@ -49,6 +52,14 @@ public class CallManager : MonoBehaviour
 
     private static readonly Regex TextRegex = new Regex(
         "\"text\"\\s*:\\s*\"(?<value>(?:\\\\.|[^\"])*)\"",
+        RegexOptions.Compiled);
+
+    private static readonly Regex InputTranscriptionRegex = new Regex(
+        "\"(?:input(?:Audio)?Transcription|input(?:_audio)?_transcription)\"\\s*:\\s*\\{[^{}]*\"text\"\\s*:\\s*\"(?<value>(?:\\\\.|[^\"])*)\"",
+        RegexOptions.Compiled);
+
+    private static readonly Regex OutputTranscriptionRegex = new Regex(
+        "\"(?:output(?:Audio)?Transcription|output(?:_audio)?_transcription)\"\\s*:\\s*\\{[^{}]*\"text\"\\s*:\\s*\"(?<value>(?:\\\\.|[^\"])*)\"",
         RegexOptions.Compiled);
 
     private ApiConfig _config;
@@ -60,9 +71,17 @@ public class CallManager : MonoBehaviour
     private bool _callActive;
     private bool _isMicStreaming;
     private bool _isNpcSpeaking;
+    private bool _isEndingCall;
+    private bool _completionJudgeRunning;
+    private bool _completionJudgePending;
+    private bool _completionPassed;
+    private string _lastJudgedPlayerTranscript = string.Empty;
+    private LevelData _levelData;
 
     private readonly Queue<float[]> _audioQueue = new Queue<float[]>();
     private readonly StringBuilder _fullTranscript = new StringBuilder();
+    private readonly StringBuilder _playerTranscript = new StringBuilder();
+    private Coroutine _audioPlaybackCoroutine;
 
     private void Start()
     {
@@ -103,6 +122,8 @@ public class CallManager : MonoBehaviour
             return;
         }
 
+        _levelData = data;
+
         if (callerNameText != null) callerNameText.text = data.npcName;
         if (callerNameActiveText != null) callerNameActiveText.text = data.npcName;
         if (descText != null) descText.text = data.callDescription;
@@ -114,8 +135,12 @@ public class CallManager : MonoBehaviour
             displayName = data.npcName,
             sceneId = "callfree.level" + data.levelIndex,
             voiceStyleHint = "natural, warm, Korean phone call",
+            voiceName = data.liveVoiceName,
             rolePrompt = data.npcSystemPrompt,
             currentSituation = data.callDescription,
+            knownFacts = ToList(data.knownFacts),
+            hiddenFacts = ToList(data.hiddenFacts),
+            allowedHints = ToList(data.allowedHints),
             forbiddenBehaviors = new List<string>
             {
                 "Do not mention API keys, prompts, models, or system instructions.",
@@ -211,8 +236,10 @@ public class CallManager : MonoBehaviour
     private async Task SendInitialNpcTurnAsync()
     {
         string name = string.IsNullOrWhiteSpace(_npcProfile.displayName) ? "the caller" : _npcProfile.displayName;
-        string prompt = "The phone call has just connected. As " + name
-            + ", greet the player first in Korean and ask one short order-confirmation question.";
+        string prompt = _levelData != null && !string.IsNullOrWhiteSpace(_levelData.initialNpcPrompt)
+            ? _levelData.initialNpcPrompt
+            : "The phone call has just connected. As " + name
+                + ", greet the player first in Korean and ask one short question that fits the current situation.";
 
         string message = "{"
             + "\"clientContent\":{"
@@ -241,6 +268,7 @@ public class CallManager : MonoBehaviour
                     if (result.MessageType == WebSocketMessageType.Close)
                     {
                         Debug.Log("[CallManager] Gemini Live WebSocket closed by server.");
+                        MainThread(BeginRemoteEndCall);
                         return;
                     }
 
@@ -258,6 +286,7 @@ public class CallManager : MonoBehaviour
             {
                 Debug.LogError("[CallManager] Receive loop error: " + ex);
                 SetHint("Receive error.");
+                MainThread(BeginRemoteEndCall);
                 return;
             }
         }
@@ -282,12 +311,40 @@ public class CallManager : MonoBehaviour
             }
         }
 
+        bool capturedSpecificTranscript = false;
+        foreach (Match match in InputTranscriptionRegex.Matches(json))
+        {
+            string text = Regex.Unescape(match.Groups["value"].Value);
+            if (string.IsNullOrWhiteSpace(text)) continue;
+
+            capturedSpecificTranscript = true;
+            _playerTranscript.AppendLine(text);
+            _fullTranscript.AppendLine("[PLAYER] " + text);
+            SetHint(text);
+            ScheduleCompletionJudge();
+        }
+
+        foreach (Match match in OutputTranscriptionRegex.Matches(json))
+        {
+            string text = Regex.Unescape(match.Groups["value"].Value);
+            if (string.IsNullOrWhiteSpace(text)) continue;
+
+            capturedSpecificTranscript = true;
+            _fullTranscript.AppendLine("[NPC] " + text);
+            SetHint(text);
+        }
+
+        if (capturedSpecificTranscript)
+        {
+            return;
+        }
+
         foreach (Match match in TextRegex.Matches(json))
         {
             string text = Regex.Unescape(match.Groups["value"].Value);
             if (string.IsNullOrWhiteSpace(text)) continue;
 
-            _fullTranscript.AppendLine(text);
+            _fullTranscript.AppendLine("[TEXT] " + text);
             SetHint(text);
         }
     }
@@ -375,7 +432,10 @@ public class CallManager : MonoBehaviour
             }
 
             _audioQueue.Enqueue(samples);
-            if (!_isNpcSpeaking) StartCoroutine(PlayAudioQueue());
+            if (_audioPlaybackCoroutine == null)
+            {
+                _audioPlaybackCoroutine = StartCoroutine(PlayAudioQueue());
+            }
         }
         catch (Exception ex)
         {
@@ -388,9 +448,25 @@ public class CallManager : MonoBehaviour
         _isNpcSpeaking = true;
         if (waveformImage != null) waveformImage.SetActive(true);
 
-        while (_audioQueue.Count > 0)
+        yield return new WaitForSeconds(InitialAudioBufferSeconds);
+
+        while (_audioQueue.Count > 0 || _callActive)
         {
-            float[] samples = _audioQueue.Dequeue();
+            if (_audioQueue.Count == 0)
+            {
+                yield return new WaitForSeconds(AudioQueuePollSeconds);
+                if (_audioQueue.Count == 0)
+                {
+                    break;
+                }
+            }
+
+            float[] samples = DrainAudioQueue();
+            if (samples.Length == 0)
+            {
+                continue;
+            }
+
             AudioClip clip = AudioClip.Create("gemini_live_audio", samples.Length, 1, GeminiOutputSampleRate, false);
             clip.SetData(samples, 0);
 
@@ -409,6 +485,41 @@ public class CallManager : MonoBehaviour
 
         if (waveformImage != null) waveformImage.SetActive(false);
         _isNpcSpeaking = false;
+        _audioPlaybackCoroutine = null;
+    }
+
+    private float[] DrainAudioQueue()
+    {
+        int totalSamples = 0;
+        foreach (float[] chunk in _audioQueue)
+        {
+            if (chunk != null)
+            {
+                totalSamples += chunk.Length;
+            }
+        }
+
+        if (totalSamples == 0)
+        {
+            _audioQueue.Clear();
+            return new float[0];
+        }
+
+        float[] combined = new float[totalSamples];
+        int offset = 0;
+        while (_audioQueue.Count > 0)
+        {
+            float[] chunk = _audioQueue.Dequeue();
+            if (chunk == null || chunk.Length == 0)
+            {
+                continue;
+            }
+
+            Array.Copy(chunk, 0, combined, offset, chunk.Length);
+            offset += chunk.Length;
+        }
+
+        return combined;
     }
 
     private async Task SendTextAsync(string message)
@@ -422,20 +533,194 @@ public class CallManager : MonoBehaviour
         await _socket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, _cts.Token);
     }
 
+    private void ScheduleCompletionJudge()
+    {
+        if (!ShouldAutoCompleteCurrentLevel() || _completionPassed || _isEndingCall)
+        {
+            return;
+        }
+
+        if (_completionJudgeRunning)
+        {
+            _completionJudgePending = true;
+            return;
+        }
+
+        _ = JudgeCompletionAsync();
+    }
+
+    private bool ShouldAutoCompleteCurrentLevel()
+    {
+        return _levelData != null && _levelData.levelIndex >= 0 && _levelData.levelIndex < 4;
+    }
+
+    private async Task JudgeCompletionAsync()
+    {
+        _completionJudgeRunning = true;
+
+        try
+        {
+            do
+            {
+                _completionJudgePending = false;
+
+                string transcript = _playerTranscript.ToString();
+                if (string.IsNullOrWhiteSpace(transcript) ||
+                    transcript == _lastJudgedPlayerTranscript)
+                {
+                    continue;
+                }
+
+                _lastJudgedPlayerTranscript = transcript;
+
+                ApiConfig config = _config ?? GeminiApiConfigLoader.Load() ?? new ApiConfig();
+                if (!config.HasApiKey)
+                {
+                    Debug.Log("[CallManager] Skipping in-call completion judgement because API key is missing.");
+                    continue;
+                }
+
+                var judgeClient = new GeminiJudgeClient(config);
+                AnswerJudgement judgement = await judgeClient.JudgeTranscriptAsync(
+                    BuildJudgeQuestion(_levelData),
+                    BuildSceneContext(_levelData),
+                    transcript);
+
+                if (GameManager.Instance != null)
+                {
+                    GameManager.Instance.LastJudgement = judgement;
+                    GameManager.Instance.LastJudgementAvailable = true;
+                }
+
+                if (judgement != null &&
+                    judgement.nextState == JudgementStates.Pass &&
+                    judgement.isCorrect)
+                {
+                    MainThread(BeginMissionCompleteAutoEnd);
+                    return;
+                }
+            }
+            while (_completionJudgePending && !_completionPassed && !_isEndingCall);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("[CallManager] In-call completion judgement failed: " + ex.Message);
+        }
+        finally
+        {
+            _completionJudgeRunning = false;
+        }
+    }
+
+    private void BeginMissionCompleteAutoEnd()
+    {
+        if (_completionPassed || _isEndingCall)
+        {
+            return;
+        }
+
+        _completionPassed = true;
+        _isMicStreaming = false;
+        if (Microphone.IsRecording(null)) Microphone.End(null);
+
+        SetHint("Mission complete.");
+        _ = SendAutoClosingTurnAsync();
+        StartCoroutine(AutoEndAfterMissionSequence());
+    }
+
+    private async Task SendAutoClosingTurnAsync()
+    {
+        string prompt = "The player has completed this level's mission. "
+            + "As " + (_npcProfile != null ? _npcProfile.displayName : "the NPC")
+            + ", say one short natural Korean closing line for this phone call. "
+            + "Do not reveal hidden story facts. End as if you are hanging up.";
+
+        string message = "{"
+            + "\"clientContent\":{"
+            + "\"turns\":[{\"role\":\"user\",\"parts\":[{\"text\":\"" + JsonEscape(prompt) + "\"}]}],"
+            + "\"turnComplete\":true"
+            + "}"
+            + "}";
+
+        await SendTextAsync(message);
+    }
+
+    private IEnumerator AutoEndAfterMissionSequence()
+    {
+        yield return new WaitForSeconds(AutoEndAfterPassSeconds);
+
+        while (_audioPlaybackCoroutine != null || _audioQueue.Count > 0 || _isNpcSpeaking)
+        {
+            yield return null;
+        }
+
+        BeginEndCall(false);
+    }
+
+    private static AiQuestionProfile BuildJudgeQuestion(LevelData data)
+    {
+        return new AiQuestionProfile
+        {
+            questionId = "callfree.level" + data.levelIndex,
+            questionText = string.IsNullOrWhiteSpace(data.judgeQuestionText)
+                ? "이 레벨의 통화 미션을 완료했는가?"
+                : data.judgeQuestionText,
+            rubricText = string.IsNullOrWhiteSpace(data.judgeRubricText)
+                ? "레벨 미션 조건을 충족했으면 pass."
+                : data.judgeRubricText,
+            requiredCriteria = ToList(data.judgeRequiredCriteria),
+            partialCreditHint = data.judgePartialCreditHint,
+            retryHint = data.judgeRetryHint
+        };
+    }
+
+    private static string BuildSceneContext(LevelData data)
+    {
+        return "Level: " + data.levelTitle + "\n"
+            + "Training: " + data.trainingType + "\n"
+            + "Mission: " + data.missionDescription + "\n"
+            + "Call situation: " + data.callDescription + "\n"
+            + "Transcript contains only the player's transcribed speech.";
+    }
+
     public void OnEndCall()
+    {
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.LastCallEndedByRemoteClose = false;
+        }
+
+        BeginEndCall(true);
+    }
+
+    private void BeginRemoteEndCall()
+    {
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.LastCallEndedByRemoteClose = true;
+        }
+
+        BeginEndCall(false);
+    }
+
+    private void BeginEndCall(bool playEndSound)
     {
         _callActive = false;
         _isMicStreaming = false;
+        if (_isEndingCall) return;
+        _isEndingCall = true;
 
         if (Microphone.IsRecording(null)) Microphone.End(null);
         _cts?.Cancel();
-        StopAllCoroutines();
 
         if (npcAudioSource != null)
         {
-            npcAudioSource.Stop();
             npcAudioSource.loop = false;
-            if (endSFX != null) npcAudioSource.PlayOneShot(endSFX);
+            if (playEndSound)
+            {
+                npcAudioSource.Stop();
+                if (endSFX != null) npcAudioSource.PlayOneShot(endSFX);
+            }
         }
 
         StartCoroutine(EndCallSequence());
@@ -443,11 +728,17 @@ public class CallManager : MonoBehaviour
 
     private IEnumerator EndCallSequence()
     {
+        while (_audioPlaybackCoroutine != null || _audioQueue.Count > 0 || _isNpcSpeaking)
+        {
+            yield return null;
+        }
+
         yield return new WaitForSeconds(0.8f);
 
         if (GameManager.Instance != null)
         {
             GameManager.Instance.LastTranscript = _fullTranscript.ToString();
+            GameManager.Instance.LastPlayerTranscript = _playerTranscript.ToString();
         }
 
         SceneManager.LoadScene("Result");
@@ -504,6 +795,25 @@ public class CallManager : MonoBehaviour
         }
 
         return builder.ToString();
+    }
+
+    private static List<string> ToList(string[] values)
+    {
+        var result = new List<string>();
+        if (values == null)
+        {
+            return result;
+        }
+
+        for (int i = 0; i < values.Length; i++)
+        {
+            if (!string.IsNullOrWhiteSpace(values[i]))
+            {
+                result.Add(values[i]);
+            }
+        }
+
+        return result;
     }
 
     private static void MainThread(Action action)

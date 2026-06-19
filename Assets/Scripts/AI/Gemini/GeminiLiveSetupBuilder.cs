@@ -17,12 +17,33 @@ namespace CallFree.AI.Gemini
             return "{"
                 + "\"setup\":{"
                 + "\"model\":\"" + JsonEscape(model) + "\","
-                + "\"generationConfig\":{\"responseModalities\":[\"AUDIO\"]},"
-                + "\"systemInstruction\":{\"parts\":[{\"text\":\"" + JsonEscape(instruction) + "\"}]},"
+                + "\"generationConfig\":{"
+                + "\"responseModalities\":[\"AUDIO\"],"
+                + "\"speechConfig\":{"
+                + "\"voiceConfig\":{"
+                + "\"prebuiltVoiceConfig\":{"
+                + "\"voiceName\":\"" + JsonEscape(GetVoiceName(config, npc)) + "\""
+                + "}"
+                + "}"
+                + "}"
+                + "},"
+                + "\"systemInstruction\":{\"parts\":[{\"text\":\"" + JsonEscape(instruction) + "\"}]}," 
                 + "\"inputAudioTranscription\":{},"
                 + "\"outputAudioTranscription\":{}"
                 + "}"
                 + "}";
+        }
+
+        private static string GetVoiceName(ApiConfig config, AiNpcProfile npc)
+        {
+            if (npc != null && !string.IsNullOrWhiteSpace(npc.voiceName))
+            {
+                return npc.voiceName.Trim();
+            }
+
+            return config == null || string.IsNullOrWhiteSpace(config.liveVoiceName)
+                ? "Charon"
+                : config.liveVoiceName.Trim();
         }
 
         private static string ToModelResourceName(string model)

@@ -13,6 +13,9 @@ public class StartSceneManager : MonoBehaviour
     public Button[] levelButtons;      // 5개
     public TextMeshProUGUI[] levelLabels;
 
+    [Header("레벨 데이터 연결")]
+    public LevelData[] levels;
+
     void Start()
     {
         ShowTitle();
@@ -59,7 +62,18 @@ public class StartSceneManager : MonoBehaviour
     public void OnLevelSelected(int levelIndex)
     {
         if (GameManager.Instance != null)
+        {
             GameManager.Instance.CurrentLevel = levelIndex;
+            if (levels != null && levelIndex >= 0 && levelIndex < levels.Length)
+            {
+                GameManager.Instance.CurrentLevelData = levels[levelIndex];
+            }
+            else
+            {
+                Debug.LogWarning("[StartSceneManager] LevelData is missing for index " + levelIndex);
+                GameManager.Instance.CurrentLevelData = null;
+            }
+        }
 
         SceneManager.LoadScene("Scenario");
     }

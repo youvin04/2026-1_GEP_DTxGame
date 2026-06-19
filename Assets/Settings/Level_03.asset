@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0516434cc7deb42c6bc62a17ec69e5f0, type: 3}
+  m_Name: Level_03
+  m_EditorClassIdentifier: Assembly-CSharp::LevelData
+  levelIndex: 2
+  levelTitle: LEVEL.3
+  npcName: "쌀집 아저씨"
+  npcSprite: {fileID: 0}
+  trainingType: "즉각적 반응의 공포 - 문장 선택 및 압박 대응 훈련"
+  missionDescription: "이장님의 빠른 질문에 적절한 문장으로 대응하며 정체를 들키지 않고 대화를 이어간다."
+  missionCardText: "미션: 할머니가 잠깐 나가셨다고 말하고, 자루와 밧줄을 챙겼다는 흐름으로 답하세요."
+  cutsceneDialogues:
+  - "치킨집 사장님이 말한 쌀집 영감에게서 전화가 걸려왔다."
+  - "이장님은 나를 할머니의 심부름꾼으로 착각한 것 같다. 침착하게 대답해야 한다."
+  npcSystemPrompt: "당신은 거친 듯하지만 악의는 없는 시골 이장님이자 쌀집 아저씨입니다. 플레이어를 김순 할머니의 심부름꾼으로 착각하고, 자루와 밧줄을 챙겼는지 빠르게 묻습니다. 너무 위협적이지 않게 압박감을 주고, 마지막에는 짜장면집 뒤로 모이라고 말하세요. 응답은 2~3문장 이내로 해주세요."
+  callDescription: "쌀집 아저씨가 먼저 전화해 할머니와 준비물 상황을 묻는다. 미션: 당황하지 말고 문장 카드처럼 짧게 대응할 것."
+  initialNpcPrompt: "통화가 연결되면 쌀집 아저씨로서 먼저 할머니 댁이냐고 묻고, 오늘 쓸 자루와 밧줄을 챙겼는지 빠르게 질문하세요."
+  knownFacts:
+  - "자루와 밧줄은 고양이 구조용 장비다."
+  - "마을 사람들은 짜장면집 뒤쪽에서 모일 예정이다."
+  hiddenFacts:
+  - "처음부터 고양이 구조라는 사실을 분명히 밝히지 않는다."
+  allowedHints:
+  - "플레이어가 준비물 이야기를 따라오면 짜장면집 뒤 집결지를 알려준다."
+  judgeQuestionText: "플레이어가 할머니가 자리에 없다는 취지로 답하고, 자루와 밧줄 준비 상황을 긍정하며 압박 질문에 대화를 이어갔는가?"
+  judgeRubricText: "할머니 부재 답변, 자루/밧줄 준비 확인, 대화 유지가 있으면 성공이다."
+  judgeRequiredCriteria:
+  - "할머니 부재 답변"
+  - "자루와 밧줄 준비 확인"
+  - "압박 질문 대응"
+  judgePartialCreditHint: "두 기준 이상 충족하면 partial 이상."
+  judgeRetryHint: "발화가 비어 있거나 NPC 질문과 무관하면 retry."
+  endingDialogues:
+  - "자루와 밧줄, 미끼, 그리고 짜장면집 뒤..."
+  - "이건 단순한 배달 사고가 아니다. 최종 집결지가 보이기 시작했다."

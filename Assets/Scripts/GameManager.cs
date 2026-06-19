@@ -1,3 +1,4 @@
+using CallFree.AI.Models;
 using UnityEngine;
 
 public class GameManager : MonoBehaviour
@@ -62,4 +63,8 @@ public class GameManager : MonoBehaviour
     public LevelData CurrentLevelData { get; set; }
     // 기존 코드에 한 줄 추가
     public string LastTranscript { get; set; } = "";
+    public string LastPlayerTranscript { get; set; } = "";
+    public bool LastCallEndedByRemoteClose { get; set; }
+    public AnswerJudgement LastJudgement { get; set; }
+    public bool LastJudgementAvailable { get; set; }
 }

@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0516434cc7deb42c6bc62a17ec69e5f0, type: 3}
+  m_Name: Level_04
+  m_EditorClassIdentifier: Assembly-CSharp::LevelData
+  levelIndex: 3
+  levelTitle: LEVEL.4
+  npcName: "짜장면집 아저씨"
+  npcSprite: {fileID: 0}
+  trainingType: "가변적 상황 대응의 공포 - 빈칸 채우기 및 정보 전달 훈련"
+  missionDescription: "짜장면집의 돌발 질문에 맞춰 주소, 메뉴, 수량 정보를 정확히 전달한다."
+  missionCardText: "미션: 풍수길 12번지 할머니 댁으로 보통 짜장면 두 개를 주문하세요."
+  cutsceneDialogues:
+  - "범인들의 최종 집결지로 보이는 짜장면집의 동태를 파악해야 한다."
+  - "진짜 배달 주문처럼 전화를 걸어 정보를 얻어내자."
+  npcSystemPrompt: "당신은 신속배달 만리장성의 짜장면집 사장님입니다. 도랑 쪽 일 때문에 주방이 정신없지만 주문은 받습니다. 플레이어에게 곱빼기인지 보통인지, 어디로 보낼지 캐묻고, 주문이 접수되면 수화기 너머로 떡집에 이름 박힌 것을 가져오라는 소음을 흘리세요. 응답은 2~3문장 이내로 해주세요."
+  callDescription: "짜장면집에 배달 전화를 건다. 미션: 메뉴, 주소, 수량을 돌발 질문에 맞춰 정확히 전달할 것."
+  initialNpcPrompt: "통화가 연결되면 짜장면집 사장님으로서 먼저 가게 이름을 말하고 무엇을 주문할지 물어보세요."
+  knownFacts:
+  - "도랑 쪽에서 고양이 구조 작전이 진행 중이다."
+  - "떡집에는 이름이 박힌 축하 떡을 시간 맞춰 가져오라고 부탁해야 한다."
+  hiddenFacts:
+  - "고양이 구조 작전의 전체 진실을 먼저 말하지 않는다."
+  allowedHints:
+  - "주문 접수 후 주변 소음처럼 떡집과 이름 박힌 물건 단서를 흘린다."
+  judgeQuestionText: "플레이어가 짜장면 주문 의도를 밝히고, 풍수길 12번지 할머니 댁과 보통 두 개 정보를 전달했는가?"
+  judgeRubricText: "메뉴, 주소, 수량/옵션이 모두 있으면 성공이다. 표현 차이는 허용한다."
+  judgeRequiredCriteria:
+  - "짜장면 주문"
+  - "풍수길 12번지 할머니 댁"
+  - "보통 두 개"
+  judgePartialCreditHint: "셋 중 둘 이상이면 partial."
+  judgeRetryHint: "주문 정보가 거의 없거나 발화가 비어 있으면 retry."
+  endingDialogues:
+  - "떡집에 이름이 박힌 물건을 시간 맞춰 가져오라니..."
+  - "모든 단서가 떡집으로 향하고 있다. 이제 마지막 확인만 남았다."

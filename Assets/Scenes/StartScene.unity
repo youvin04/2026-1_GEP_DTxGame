@@ -656,6 +656,12 @@ MonoBehaviour:
   scenarioSelectScreen: {fileID: 852457399}
   levelButtons: []
   levelLabels: []
+  levels:
+  - {fileID: 11400000, guid: 1d5ce80fb53b4f45a1bf2cf4251c0101, type: 2}
+  - {fileID: 11400000, guid: 2d5ce80fb53b4f45a1bf2cf4251c0202, type: 2}
+  - {fileID: 11400000, guid: 3d5ce80fb53b4f45a1bf2cf4251c0303, type: 2}
+  - {fileID: 11400000, guid: 4d5ce80fb53b4f45a1bf2cf4251c0404, type: 2}
+  - {fileID: 11400000, guid: fd07e4db3f27c4d919801d48112cd0fc, type: 2}
 --- !u!114 &807555187
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -669,6 +675,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LevelSelectManager
   levels:
+  - {fileID: 11400000, guid: 1d5ce80fb53b4f45a1bf2cf4251c0101, type: 2}
+  - {fileID: 11400000, guid: 2d5ce80fb53b4f45a1bf2cf4251c0202, type: 2}
+  - {fileID: 11400000, guid: 3d5ce80fb53b4f45a1bf2cf4251c0303, type: 2}
+  - {fileID: 11400000, guid: 4d5ce80fb53b4f45a1bf2cf4251c0404, type: 2}
   - {fileID: 11400000, guid: fd07e4db3f27c4d919801d48112cd0fc, type: 2}
 --- !u!1 &852457399
 GameObject:

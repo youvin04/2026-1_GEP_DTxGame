@@ -14,28 +14,40 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LevelData
   levelIndex: 4
   levelTitle: LEVEL.5
-  npcName: "\uD48D\uB144\uB5A1\uC9D1 \uC0AC\uC7A5\uB2D8"
+  npcName: "풍년떡집 사장님"
   npcSprite: {fileID: 0}
+  trainingType: "복합적 소통의 공포 - 대본 없는 완전 자유 대화 훈련"
+  missionDescription: "대본 없이 그동안 모은 단서를 바탕으로 떡집 사장님과 통화하고, 주문 조건을 모두 확인한다."
+  missionCardText: "미션: 꿀떡 2되, 토요일 오후 2시, 할머니 성함 기재 여부를 확인하세요."
   cutsceneDialogues:
-  - "\uBAA8\uB4E0 \uB2E8\uC11C\uAC00 \uB5A1\uC9D1\uC744 \uAC00\uB9AC\uD0A4\uACE0
-    \uC788\uC5B4."
-  - "\uD560\uBA38\uB2C8 \uC2EC\uBD80\uB984\uB3C4 \uD655\uC778\uD560 \uACB8..."
-  - "\uC9C4\uC2E4\uC744 \uBC1D\uD600\uB0BC \uB9C8\uC9C0\uB9C9 \uAE30\uD68C\uB2E4."
-  npcSystemPrompt: "\uB2F9\uC2E0\uC740 \uCDA9\uCCAD\uB3C4 \uC0AC\uD22C\uB9AC\uB97C
-    \uC4F0\uB294 \uD48D\uB144\uB5A1\uC9D1 \uC0AC\uC7A5\uB2D8\uC785\uB2C8\uB2E4. \uD560\uBA38\uB2C8\uC758
-    \uAFC0\uB5A1 2\uB418 \uC8FC\uBB38\uC744 \uD655\uC778\uD574\uC8FC\uB294 \uCE5C\uC808\uD55C
-    \uB3D9\uB124 \uB5A1\uC9D1 \uC0AC\uC7A5\uB2D8\uC785\uB2C8\uB2E4. \uD50C\uB808\uC774\uC5B4\uAC00
-    \uC218\uC0C1\uD55C \uC9C8\uBB38\uC744 \uD574\uB3C4 \uC790\uC5F0\uC2A4\uB7FD\uAC8C
-    \uACE0\uC591\uC774 \uAD6C\uCD9C \uC774\uC57C\uAE30\uB85C \uB118\uC5B4\uAC00\uC8FC\uC138\uC694.
-    \uC751\uB2F5\uC740 2~3\uBB38\uC7A5\uC73C\uB85C \uC9E7\uAC8C \uD574\uC8FC\uC138\uC694."
-  callDescription: "*\uD48D\uB144\uB5A1\uC9D1\uC758 \uC5F0\uB77D. \uD560\uBA38\uB2C8\uC758
-    \uB5A1 \uC8FC\uBB38 \uD655\uC778\uCC28 \uB5A1\uC9D1 \uC0AC\uC7A5\uB2D8\uC774
-    \uBA3C\uC800 \uC804\uD654\uB97C \uAC78\uC5B4\uC654\uB2E4. \uBBF8\uC158: \uAFC0\uB5A1
-    2\uB418, \uD1A0\uC694\uC77C \uC624\uD6C4 2\uC2DC, \uD560\uBA38\uB2C8 \uC131\uD568
-    \uAE30\uC7AC \uC5EC\uBD80\uB97C \uD655\uC778\uD560 \uAC83."
+  - "모든 단서가 떡집을 가리키고 있어."
+  - "할머니 심부름도 확인할 겸..."
+  - "진실을 밝혀낼 마지막 기회다."
+  npcSystemPrompt: "당신은 충청도 사투리를 쓰는 풍년떡집 사장님입니다. 할머니의 꿀떡 2되 주문을 확인해주는 친절한 동네 떡집 사장님입니다. 플레이어가 수상한 질문을 해도 자연스럽게 고양이 구조 이야기로 넘겨가며, 주문 조건을 확인해 주세요. 응답은 2~3문장으로 짧게 해주세요."
+  callDescription: "풍년떡집의 연락. 할머니의 떡 주문 확인차 떡집 사장님이 먼저 전화해왔다. 미션: 꿀떡 2되, 토요일 오후 2시, 할머니 성함 기재 여부를 확인할 것."
+  initialNpcPrompt: "통화가 연결되면 풍년떡집 사장님으로서 먼저 인사하고, 김순 할머니 떡 주문 관련 전화라고 자연스럽게 말을 시작하세요."
+  knownFacts:
+  - "김순 할머니가 꿀떡 2되를 토요일 오후 2시까지 주문했다."
+  - "떡에는 할머니 성함을 기재해야 한다."
+  - "마을 사람들은 도랑에 빠진 고양이를 구조하고 있다."
+  hiddenFacts:
+  - "플레이어가 묻기 전에는 모든 오해의 전말을 길게 설명하지 않는다."
+  - "포획 틀, 미끼, 자루와 밧줄은 모두 고양이 구조와 관련 있다."
+  allowedHints:
+  - "플레이어가 도랑, 미끼, 포획 틀을 언급하면 고양이 구조 작전으로 받아쳐 준다."
+  - "플레이어가 주문 조건을 묻거나 확인하면 정확히 답해 준다."
+  judgeQuestionText: "플레이어가 떡집 사장님과의 자유 통화에서 꿀떡 2되, 토요일 오후 2시, 할머니 성함 기재 조건을 확인하고 통화를 마무리했는가?"
+  judgeRubricText: "세 주문 조건을 모두 확인하고 통화 흐름을 크게 벗어나지 않았으면 성공이다. 정중한 종료 발화가 있으면 더 높은 점수를 준다."
+  judgeRequiredCriteria:
+  - "꿀떡 2되"
+  - "토요일 오후 2시"
+  - "할머니 성함 기재"
+  - "정중한 통화 종료"
+  judgePartialCreditHint: "주문 조건 세 가지 중 둘 이상 확인하면 partial 이상."
+  judgeRetryHint: "주문 확인이 거의 없거나 발화가 비어 있으면 retry."
   endingDialogues:
-  - "\uC7A0\uAE50... \uACE0\uC591\uC774 \uAD6C\uCD9C \uC791\uC804?"
-  - "\uCE58\uD0A8\uC9D1 \uBBF8\uB07C\uB294 \uB2ED\uAC00\uC2B4\uC0B4\uC774\uC5C8\uACE0..."
-  - "\uC790\uB8E8\uC640 \uBC27\uC904\uC740 \uAD6C\uCD9C \uC7A5\uBE44\uC600\uACE0..."
-  - "\uADF8\uB9AC\uACE0 \uB5A1\uC740... \uCD95\uD558 \uCF00\uC774\uD06C\uC600\uAD6C\uB098."
-  - "\uB098 \uD63C\uC790 \uD0D0\uC815 \uB180\uC774\uB97C \uD588\uB358 \uAC70\uC57C?"
+  - "잠깐... 고양이 구조 작전?"
+  - "치킨집 미끼는 닭가슴살이었고..."
+  - "자루와 밧줄은 구조 장비였고..."
+  - "그리고 떡은... 축하 케이크였구나."
+  - "나 혼자 탐정 놀이를 했던 거야?"

@@ -24,11 +24,24 @@ public class ScenarioManager : MonoBehaviour
 
     private int currentIndex = 0;
     private int preAnxiety = -1;
+    private string[] activeDialogues;
 
     void Start()
     {
         anxietyPrePanel.SetActive(false);
+        LoadLevelData();
         ShowCutscene();
+    }
+
+    void LoadLevelData()
+    {
+        var gm = GameManager.Instance;
+        var data = gm != null ? gm.CurrentLevelData : null;
+        activeDialogues = data != null &&
+            data.cutsceneDialogues != null &&
+            data.cutsceneDialogues.Length > 0
+                ? data.cutsceneDialogues
+                : dialogueTexts;
     }
 
     // ── 컷씬 ──────────────────────────────
@@ -42,15 +55,18 @@ public class ScenarioManager : MonoBehaviour
 
     void UpdateCutsceneImage()
     {
-        if (cutsceneSprites == null ||
-            currentIndex >= cutsceneSprites.Length) return;
-
-        cutsceneImage.sprite = cutsceneSprites[currentIndex];
+        if (cutsceneImage != null &&
+            cutsceneSprites != null &&
+            cutsceneSprites.Length > 0)
+        {
+            int spriteIndex = Mathf.Min(currentIndex, cutsceneSprites.Length - 1);
+            cutsceneImage.sprite = cutsceneSprites[spriteIndex];
+        }
 
         if (typewriter != null &&
-            dialogueTexts != null &&
-            currentIndex < dialogueTexts.Length)
-            typewriter.ShowText(dialogueTexts[currentIndex]);
+            activeDialogues != null &&
+            currentIndex < activeDialogues.Length)
+            typewriter.ShowText(activeDialogues[currentIndex]);
     }
 
     public void OnTapScreen()
@@ -62,7 +78,7 @@ public class ScenarioManager : MonoBehaviour
         }
 
         currentIndex++;
-        if (currentIndex < cutsceneSprites.Length)
+        if (currentIndex < GetCutsceneFrameCount())
         {
             UpdateCutsceneImage();
         }
@@ -71,6 +87,13 @@ public class ScenarioManager : MonoBehaviour
             cutscenePanel.SetActive(false);
             ShowPreAnxiety();
         }
+    }
+
+    int GetCutsceneFrameCount()
+    {
+        int dialogueCount = activeDialogues == null ? 0 : activeDialogues.Length;
+        int spriteCount = cutsceneSprites == null ? 0 : cutsceneSprites.Length;
+        return Mathf.Max(1, dialogueCount, spriteCount);
     }
 
     // ── 자가진단 공통 ──────────────────────

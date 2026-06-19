@@ -8,6 +8,7 @@ namespace CallFree.AI.Models
         public string geminiApiKey = string.Empty;
         public string liveModel = "gemini-2.5-flash-native-audio-preview-12-2025";
         public string judgeModel = "gemini-2.5-flash";
+        public string liveVoiceName = "Charon";
         public string language = "ko-KR";
         public bool saveApiKeyLocally = true;
         public string generateContentBaseUrl = 

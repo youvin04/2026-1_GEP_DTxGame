@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0516434cc7deb42c6bc62a17ec69e5f0, type: 3}
+  m_Name: Level_02
+  m_EditorClassIdentifier: Assembly-CSharp::LevelData
+  levelIndex: 1
+  levelTitle: LEVEL.2
+  npcName: "외갓집 치킨 아저씨"
+  npcSprite: {fileID: 0}
+  trainingType: "내 의사 표현 및 거절 대응 공포 - 대본 읽기 훈련"
+  missionDescription: "대본을 보고 치킨 주문을 시도한 뒤, 사장님이 거절하면 당황하지 않고 통화를 마무리한다."
+  missionCardText: "미션: 할머니 댁으로 후라이드 치킨 한 마리 배달 가능 여부를 묻고, 거절을 들으면 괜찮다고 말하세요."
+  cutsceneDialogues:
+  - "포획 틀 옆에서 외갓집 치킨 영수증과 '미끼 준비 완료'라는 메모를 발견했다."
+  - "치킨집이 수상하다. 주문 전화를 걸어 정보를 떠봐야겠다."
+  npcSystemPrompt: "당신은 바쁜 시골 치킨집 사장님입니다. 오늘 마을의 중요한 거사 때문에 치킨을 튀기기 어렵습니다. 플레이어가 주문하면 미안해하며 거절하고, 전화를 끊기 직전 쌀집 영감과 도랑 뒤 준비물 이야기를 자연스럽게 흘리세요. 응답은 2~3문장 이내로 해주세요."
+  callDescription: "외갓집 치킨에 위장 주문 전화를 건다. 미션: 주소와 메뉴를 말하고, 거절을 들으면 자연스럽게 통화를 끝낼 것."
+  initialNpcPrompt: "통화가 연결되면 외갓집 치킨 사장님으로서 먼저 인사하고, 지금 바쁜데 무슨 일이냐고 물어보세요."
+  knownFacts:
+  - "오늘 마을 사람들은 도랑 뒤에서 고양이 구조 작전을 준비 중이다."
+  - "치킨은 고양이를 유인할 미끼용 닭가슴살과 관련 있다."
+  hiddenFacts:
+  - "처음부터 고양이 구조 작전이라고 직접 밝히지 않는다."
+  - "플레이어가 주문하면 치킨 영업이 어렵다고 거절한다."
+  allowedHints:
+  - "통화 마지막에 쌀집 영감, 준비물, 도랑 뒤 이야기를 흘릴 수 있다."
+  judgeQuestionText: "플레이어가 치킨집에 주소/상황과 후라이드 치킨 한 마리 주문 의도를 말하고, 거절을 들은 뒤 괜찮다고 통화를 마무리했는가?"
+  judgeRubricText: "주문 의도, 메뉴/수량, 거절 수용 또는 종료 발화가 있으면 성공이다."
+  judgeRequiredCriteria:
+  - "할머니 댁 또는 주소 맥락"
+  - "후라이드 치킨 한 마리 주문"
+  - "거절 수용 또는 정중한 종료"
+  judgePartialCreditHint: "핵심 주문은 했지만 종료 발화가 없으면 partial."
+  judgeRetryHint: "주문 의도가 불명확하거나 발화가 비어 있으면 retry."
+  endingDialogues:
+  - "오늘 밤 도랑 뒤에서 거사라니..."
+  - "치킨집은 영업도 멈추고 뭔가 준비하고 있었다. 단서가 하나 더 생겼다."

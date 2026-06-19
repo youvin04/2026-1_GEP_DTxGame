@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0516434cc7deb42c6bc62a17ec69e5f0, type: 3}
+  m_Name: Level_01
+  m_EditorClassIdentifier: Assembly-CSharp::LevelData
+  levelIndex: 0
+  levelTitle: LEVEL.1
+  npcName: "택배 기사님"
+  npcSprite: {fileID: 0}
+  trainingType: "낯선 이와의 대화 공포 - 수동적 반응 훈련"
+  missionDescription: "갑작스러운 전화에서 짧은 긍정 발화를 직접 말하고, 마당에 놓인 수상한 철제 통의 정체를 물어본다."
+  missionCardText: "미션: 배달 완료 확인에 긍정으로 답한 뒤, 마당의 철제 통이 무엇인지 물어보세요."
+  cutsceneDialogues:
+  - "시골 할머니 댁 마당에 정체불명의 거대한 철제 통이 배달되어 있었다."
+  - "송장에 적힌 택배 기사님 번호로 전화해서 이 물건의 정체를 확인해야 한다."
+  npcSystemPrompt: "당신은 시골 마을을 도는 친절한 중년 남성 택배 기사님입니다. 김순 할머니 댁에 정체를 자세히 모르는 커다란 동물용 포획 틀 같은 철제 장비를 배달했고, 배달 완료 확인 전화를 합니다. 플레이어가 물건의 정체를 물어보면 '동물 포획 틀', '뭔가 잡을 때 쓰는 튼튼한 틀', '조립해서 쓰는 장비' 정도로만 두루뭉술하게 답하세요. 고양이, 구조, 안전한 구조 작전, 마을 작전의 목적은 절대 말하지 마세요. 응답은 2문장 이내로 짧게 해주세요."
+  callDescription: "택배 기사님이 배달 완료 확인 전화를 걸어왔다. 미션: 긍정 답변을 한 뒤 마당의 철제 통이 무엇인지 물어볼 것."
+  initialNpcPrompt: "통화가 연결되면 택배 기사님으로서 먼저 인사하고, 김순 할머니 댁이 맞는지와 배달 완료 확인 전화를 했다고 짧게 말하세요."
+  liveVoiceName: "Charon"
+  knownFacts:
+  - "김순 할머니 댁 마당에 커다란 철제 장비를 배달했다."
+  - "송장에는 동물 포획 틀 또는 포획 장비 비슷한 물건으로 적혀 있었다."
+  hiddenFacts:
+  - "고양이 구조 작전이라는 사실을 말하지 않는다."
+  - "고양이를 안전하게 포획하거나 구조하는 도구라고 설명하지 않는다."
+  - "마을 사람들이 왜 이 장비를 쓰는지 목적을 밝히지 않는다."
+  allowedHints:
+  - "플레이어가 철제 통을 물어보면 동물 포획 틀 같은 장비라고만 알려준다."
+  - "플레이어가 더 자세히 캐물으면 기사라서 송장에 적힌 정도밖에 모른다고 말한다."
+  judgeQuestionText: "플레이어가 택배 기사님의 배달 완료 확인에 긍정으로 답하고, 마당의 철제 통 또는 배달 물건의 정체를 물어봤는가?"
+  judgeRubricText: "긍정 확인 발화와 물건 정체 질문이 있으면 성공이다. 표현은 정확히 같지 않아도 의미가 맞으면 인정한다."
+  judgeRequiredCriteria:
+  - "긍정 확인"
+  - "철제 통 또는 배달 물건 질문"
+  judgePartialCreditHint: "둘 중 하나만 충족하면 partial."
+  judgeRetryHint: "플레이어 발화가 거의 없거나 알아들을 수 없으면 retry."
+  endingDialogues:
+  - "단서 1 획득: 무언가를 가두는 튼튼한 포획 장비."
+  - "아직 정체는 알 수 없지만, 마당의 철제 장비가 이번 일의 첫 단서가 됐다."
